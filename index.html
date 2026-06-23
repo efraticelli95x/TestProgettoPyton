@@ -1,54 +1,137 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
     <meta charset="UTF-8">
-    <title>Frontend di Collaudo</title>
+    <title>Area Riservata</title>
     <style>
-        body { font-family: system-ui, sans-serif; background: #1a1a1a; color: white; padding: 40px; max-width: 400px; }
-        input, button { display: block; width: 100%; margin: 10px 0; padding: 10px; border-radius: 6px; border: none; }
-        button { background: #4ade80; color: black; font-weight: bold; cursor: pointer; }
-        #output { margin-top: 20px; padding: 15px; border-radius: 6px; display: none; }
+        body {
+            font-family: system-ui, sans-serif;
+            background: #0f172a;
+            color: white;
+            padding: 40px;
+            max-width: 400px;
+            margin: auto;
+        }
+
+        input,
+        button {
+            display: block;
+            width: 100%;
+            margin: 12px 0;
+            padding: 12px;
+            border-radius: 6px;
+            border: none;
+            box-sizing: border-box;
+        }
+
+        .btn-login {
+            background: #3b82f6;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-secret {
+            background: #f59e0b;
+            color: black;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        #statusBox {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+            font-family: monospace;
+            word-wrap: break-word;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+        }
     </style>
 </head>
+
 <body>
 
-    <h2>Anagrafica Python</h2>
-    <input type="text" id="nome" placeholder="Il tuo nome">
-    <input type="number" id="anno" placeholder="Anno di nascita (es. 1992)">
-    <button onclick="invia()">Registra Utente</button>
+    <div class="card">
+        <h2>1. Autenticazione</h2>
+        <input type="text" id="user" placeholder="Username (scrivi: admin)">
+        <input type="password" id="pass" placeholder="Password (scrivi: password)">
+        <button class="btn-login" onclick="eseguiLogin()">Fai Login</button>
+    </div>
 
-    <div id="output"></div>
+    <div class="card">
+        <h2>2. Cassaforte Dati</h2>
+        <button class="btn-secret" onclick="chiediDati()">Scarica Dati Protetti</button>
+    </div>
+
+    <div id="statusBox"></div>
 
     <script>
-        async function invia() {
-            const output = document.getElementById('output');
-            const payload = {
-                nome: document.getElementById('nome').value,
-                anno_nascita: parseInt(document.getElementById('anno').value)
-            };
+        // Qui la memoria del browser conserverà il "timbro sul polso"
+        let tokenCustodito = null;
+        const BASE_URL = "https://testprogettopyton.onrender.com";
 
-            try {
-                const res = await fetch("http://localhost:8000/registra", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
+        async function eseguiLogin() {
+            const box = document.getElementById('statusBox');
+            const u = document.getElementById('user').value;
+            const p = document.getElementById('pass').value;
 
-                const data = await res.json();
-                output.style.display = "block";
+            const res = await fetch(`${BASE_URL}/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: u, password: p })
+            });
 
-                if (res.ok) {
-                    output.style.background = "#065f46"; // Verde successo
-                    output.innerText = `${data.messaggio} Età calcolata dal server: ${data.eta}`;
-                } else {
-                    output.style.background = "#991b1b"; // Rosso errore Pydantic
-                    output.innerText = `Errore 422: ${JSON.stringify(data.detail[0].msg)}`;
+            const data = await res.json();
+            box.style.display = "block";
+
+            if (data.status === "success") {
+                tokenCustodito = data["x-token"]; // <-- IL MOMENTO CHIAVE: INIZIATO IL TRACKING
+                box.style.background = "#065f46";
+                box.innerText = `[200 OK] Login Riuscito!\nToken salvato in RAM: "${tokenCustodito}"`;
+            } else {
+                tokenCustodito = null;
+                box.style.background = "#991b1b";
+                box.innerText = `[401 Errore] ${data.messaggio}`;
+            }
+        }
+
+        async function chiediDati() {
+            const box = document.getElementById('statusBox');
+            box.style.display = "block";
+
+            if (!tokenCustodito) {
+                box.style.background = "#b45309";
+                box.innerText = "ACCESSO NEGATO CLIENT-SIDE:\nNon hai un token. Fai prima il login sopra.";
+                return;
+            }
+
+            const res = await fetch(`${BASE_URL}/dati-protetti`, {
+                method: "GET",
+                headers: {
+                    "x-token": tokenCustodito  // <-- ESIBIAMO IL TOKEN ALLA PORTA DEL SERVER
                 }
+            });
 
-            } catch (e) {
-                alert("Il server Python è spento o il CORS sta bloccando!");
+            if (res.ok) {
+                const data = await res.json();
+                box.style.background = "#1e3a8a";
+                box.innerText = `[200 OK] Accesso Concesso dal Server!\nDati estratti: ${JSON.stringify(data.dati)}`;
+            } else {
+                box.style.background = "#991b1b";
+                box.innerText = `[Errore ${res.status}] Il server ha rifiutato il braccialetto!`;
             }
         }
     </script>
 </body>
+
 </html>
