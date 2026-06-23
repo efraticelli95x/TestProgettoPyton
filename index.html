@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Frontend di Collaudo</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #1a1a1a; color: white; padding: 40px; max-width: 400px; }
+        input, button { display: block; width: 100%; margin: 10px 0; padding: 10px; border-radius: 6px; border: none; }
+        button { background: #4ade80; color: black; font-weight: bold; cursor: pointer; }
+        #output { margin-top: 20px; padding: 15px; border-radius: 6px; display: none; }
+    </style>
+</head>
+<body>
+
+    <h2>Anagrafica Python</h2>
+    <input type="text" id="nome" placeholder="Il tuo nome">
+    <input type="number" id="anno" placeholder="Anno di nascita (es. 1992)">
+    <button onclick="invia()">Registra Utente</button>
+
+    <div id="output"></div>
+
+    <script>
+        async function invia() {
+            const output = document.getElementById('output');
+            const payload = {
+                nome: document.getElementById('nome').value,
+                anno_nascita: parseInt(document.getElementById('anno').value)
+            };
+
+            try {
+                const res = await fetch("http://localhost:8000/registra", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                output.style.display = "block";
+
+                if (res.ok) {
+                    output.style.background = "#065f46"; // Verde successo
+                    output.innerText = `${data.messaggio} Età calcolata dal server: ${data.eta}`;
+                } else {
+                    output.style.background = "#991b1b"; // Rosso errore Pydantic
+                    output.innerText = `Errore 422: ${JSON.stringify(data.detail[0].msg)}`;
+                }
+
+            } catch (e) {
+                alert("Il server Python è spento o il CORS sta bloccando!");
+            }
+        }
+    </script>
+</body>
+</html>
