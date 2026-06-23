@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 from sqlalchemy import Column, Integer, String, create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 # 1. Cattura la stringa da Render (se avvii il file sul tuo PC, userà un file SQLite locale di scorta!)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sqlite_locale.db")
