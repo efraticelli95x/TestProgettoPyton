@@ -32,6 +32,27 @@
             cursor: pointer;
         }
 
+        .btn-toggle-reg {
+            background: #6366f1;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-register {
+            background: #10b981;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-close {
+            background: #475569;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
         .btn-secret {
             background: #f59e0b;
             color: black;
@@ -66,6 +87,16 @@
         <input type="text" id="user" placeholder="Username (scrivi: admin)">
         <input type="password" id="pass" placeholder="Password (scrivi: password)">
         <button class="btn-login" onclick="eseguiLogin()">Fai Login</button>
+        <button class="btn-toggle-reg" onclick="mostraRegistrazione()">Registrati</button>
+    </div>
+
+    <!-- Modulo di registrazione nascosto all'avvio -->
+    <div id="registerCard" class="card" style="display: none;">
+        <h2>Nuova Registrazione</h2>
+        <input type="text" id="regNome" placeholder="Nome">
+        <input type="number" id="regAnnoNascita" placeholder="Anno di nascita">
+        <button class="btn-register" onclick="eseguiRegistrazione()">Invia Registrazione</button>
+        <button class="btn-close" onclick="nascondiRegistrazione()">Annulla</button>
     </div>
 
     <div class="card">
@@ -78,7 +109,62 @@
     <script>
         // Qui la memoria del browser conserverà il "timbro sul polso"
         let tokenCustodito = null;
+        
         const BASE_URL = "https://testprogettopyton.onrender.com";
+
+        function mostraRegistrazione() {
+            document.getElementById('registerCard').style.display = 'block';
+            document.getElementById('statusBox').style.display = 'none';
+        }
+
+        function nascondiRegistrazione() {
+            document.getElementById('registerCard').style.display = 'none';
+            // Pulisci i campi
+            document.getElementById('regNome').value = '';
+            document.getElementById('regAnnoNascita').value = '';
+        }
+
+        async function eseguiRegistrazione() {
+            const box = document.getElementById('statusBox');
+            const nome = document.getElementById('regNome').value;
+            const annoNascita = document.getElementById('regAnnoNascita').value;
+
+            if (!nome || !annoNascita) {
+                box.style.display = "block";
+                box.style.background = "#b45309";
+                box.innerText = "ATTENZIONE:\nInserisci sia il nome che l'anno di nascita.";
+                return;
+            }
+
+            box.style.display = "block";
+            box.style.background = "#334155";
+            box.innerText = "Registrazione in corso...";
+
+            try {
+                const res = await fetch(`${BASE_URL}/registra`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        nome: nome,
+                        anno_nascita: parseInt(annoNascita)
+                    })
+                });
+
+                const data = await res.json();
+
+                if (res.ok && data.status === "success") {
+                    box.style.background = "#065f46";
+                    box.innerText = `[${res.status} OK] Registrazione Riuscita!\nMessaggio: "${data.messaggio}"\nEtà calcolata: ${data.eta}\nID DB: ${data.id_database}`;
+                    nascondiRegistrazione();
+                } else {
+                    box.style.background = "#991b1b";
+                    box.innerText = `[Errore] Registrazione fallita.\nDettagli: ${JSON.stringify(data)}`;
+                }
+            } catch (err) {
+                box.style.background = "#991b1b";
+                box.innerText = `[Errore di Rete] Impossibile contattare il server.\n${err.message}`;
+            }
+        }
 
         async function eseguiLogin() {
             const box = document.getElementById('statusBox');
