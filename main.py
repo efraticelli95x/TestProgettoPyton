@@ -25,6 +25,8 @@ class UtenteDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String)
     anno_nascita = Column(Integer)
+    username = Column(String)
+    password = Column(String)
 
 
 # Ordina a Postgres di creare la tabella 'utenti' se non esiste già
@@ -55,6 +57,8 @@ app.add_middleware(
 class AnagraficaUtente(BaseModel):
     nome: str
     anno_nascita: int
+    username: str
+    password: str
 
 class CredenzialiLogin(BaseModel):
     username: str
@@ -63,21 +67,22 @@ class CredenzialiLogin(BaseModel):
 @app.post("/registra")
 def registra_utente(utente: AnagraficaUtente, db: Session = Depends(get_db)):
     eta_calcolata = date.today().year - utente.anno_nascita
-    nuovo_utente = UtenteDB(nome = utente.nome, anno_nascita = utente.anno_nascita)
+    nuovo_utente = UtenteDB(nome = utente.nome, anno_nascita = utente.anno_nascita, username = utente.username, password = utente.password)
     db.add(nuovo_utente)
     db.commit()
     db.refresh(nuovo_utente)
 
     return {
-        "messaggio": f"Ciao {utente.nome}!",
+        "messaggio": f"Ciao {utente.username}!",
         "eta": eta_calcolata,
         "status": "success",
         "id_database": nuovo_utente.id  # Ora possiamo restituire l'ID reale!
     }
 
 @app.post("/login")
-def login_utente(utente: CredenzialiLogin):
-    if utente.username == "admin" and utente.password == "password":
+def login_utente(utente: CredenzialiLogin, db: Session = Depends(get_db)):
+    utente_trovato = db.query(UtenteDB).filter(UtenteDB.username == utente.username, UtenteDB.password == utente.password).first()
+    if utente_trovato:
         return {
             "messaggio": "Benvenuto!",
             "status": "success",

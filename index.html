@@ -77,17 +77,46 @@
             margin-bottom: 20px;
             border: 1px solid #334155;
         }
+
+        /* Spinner CSS Loader */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #3b82f6;
+            animation: spin 1s linear infinite;
+            margin: 15px auto;
+            display: none;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 
 <body>
 
-    <div class="card">
+    <div class="card" id="loginCard">
         <h2>1. Autenticazione</h2>
-        <input type="text" id="user" placeholder="Username (scrivi: admin)">
-        <input type="password" id="pass" placeholder="Password (scrivi: password)">
+        <input type="text" id="user" placeholder="Username">
+        <input type="password" id="pass" placeholder="Password">
         <button class="btn-login" onclick="eseguiLogin()">Fai Login</button>
         <button class="btn-toggle-reg" onclick="mostraRegistrazione()">Registrati</button>
+    </div>
+
+    <!-- Scheda di benvenuto visibile solo dopo il login -->
+    <div id="welcomeCard" class="card" style="display: none;">
+        <h2>Area Riservata</h2>
+        <p>Benvenuto, <strong id="nomeUtenteConnesso">Utente</strong>!</p>
+        <button class="btn-close" onclick="eseguiLogout()">Esci (Logout)</button>
     </div>
 
     <!-- Modulo di registrazione nascosto all'avvio -->
@@ -95,15 +124,18 @@
         <h2>Nuova Registrazione</h2>
         <input type="text" id="regNome" placeholder="Nome">
         <input type="number" id="regAnnoNascita" placeholder="Anno di nascita">
+        <input type="text" id="regUser" placeholder="Username">
+        <input type="password" id="regPass" placeholder="Password">
         <button class="btn-register" onclick="eseguiRegistrazione()">Invia Registrazione</button>
         <button class="btn-close" onclick="nascondiRegistrazione()">Annulla</button>
     </div>
 
-    <div class="card">
+    <div class="card" id="cassaforteCard" style="display: none;">
         <h2>2. Cassaforte Dati</h2>
         <button class="btn-secret" onclick="chiediDati()">Scarica Dati Protetti</button>
     </div>
 
+    <div id="loader" class="spinner"></div>
     <div id="statusBox"></div>
 
     <script>
@@ -114,31 +146,38 @@
 
         function mostraRegistrazione() {
             document.getElementById('registerCard').style.display = 'block';
+            document.getElementById('loginCard').style.display = 'none';
             document.getElementById('statusBox').style.display = 'none';
         }
 
         function nascondiRegistrazione() {
             document.getElementById('registerCard').style.display = 'none';
+            document.getElementById('loginCard').style.display = 'block';
             // Pulisci i campi
             document.getElementById('regNome').value = '';
             document.getElementById('regAnnoNascita').value = '';
+            document.getElementById('regUser').value = '';
+            document.getElementById('regPass').value = '';
         }
 
         async function eseguiRegistrazione() {
             const box = document.getElementById('statusBox');
             const nome = document.getElementById('regNome').value;
             const annoNascita = document.getElementById('regAnnoNascita').value;
+            const username = document.getElementById('regUser').value;
+            const password = document.getElementById('regPass').value;
 
-            if (!nome || !annoNascita) {
+            if (!nome || !annoNascita || !username || !password) {
                 box.style.display = "block";
                 box.style.background = "#b45309";
-                box.innerText = "ATTENZIONE:\nInserisci sia il nome che l'anno di nascita.";
+                box.innerText = "ATTENZIONE:\nCompila tutti i campi (Nome, Anno di nascita, Username e Password).";
                 return;
             }
 
             box.style.display = "block";
             box.style.background = "#334155";
             box.innerText = "Registrazione in corso...";
+            setCaricamento(true);
 
             try {
                 const res = await fetch(`${BASE_URL}/registra`, {
@@ -146,7 +185,9 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         nome: nome,
-                        anno_nascita: parseInt(annoNascita)
+                        anno_nascita: parseInt(annoNascita),
+                        username: username,
+                        password: password
                     })
                 });
 
@@ -163,7 +204,18 @@
             } catch (err) {
                 box.style.background = "#991b1b";
                 box.innerText = `[Errore di Rete] Impossibile contattare il server.\n${err.message}`;
+            } finally {
+                setCaricamento(false);
             }
+        }
+
+        function setCaricamento(stato) {
+            const loader = document.getElementById('loader');
+            loader.style.display = stato ? 'block' : 'none';
+            
+            // Disabilita tutti i bottoni della pagina per evitare doppie richieste
+            const bottoni = document.querySelectorAll('button');
+            bottoni.forEach(btn => btn.disabled = stato);
         }
 
         async function eseguiLogin() {
@@ -171,24 +223,59 @@
             const u = document.getElementById('user').value;
             const p = document.getElementById('pass').value;
 
-            const res = await fetch(`${BASE_URL}/login`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username: u, password: p })
-            });
-
-            const data = await res.json();
             box.style.display = "block";
+            box.style.background = "#334155";
+            box.innerText = "Accesso in corso...";
+            setCaricamento(true);
 
-            if (data.status === "success") {
-                tokenCustodito = data["x-token"]; // <-- IL MOMENTO CHIAVE: INIZIATO IL TRACKING
-                box.style.background = "#065f46";
-                box.innerText = `[200 OK] Login Riuscito!\nToken salvato in RAM: "${tokenCustodito}"`;
-            } else {
+            try {
+                const res = await fetch(`${BASE_URL}/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username: u, password: p })
+                });
+
+                const data = await res.json();
+
+                if (data.status === "success") {
+                    tokenCustodito = data["x-token"]; // <-- IL MOMENTO CHIAVE: INIZIATO IL TRACKING
+                    box.style.background = "#065f46";
+                    box.innerText = `[200 OK] Login Riuscito!\nToken salvato in RAM: "${tokenCustodito}"`;
+
+                    // Aggiorna l'interfaccia utente
+                    document.getElementById('loginCard').style.display = 'none';
+                    document.getElementById('welcomeCard').style.display = 'block';
+                    document.getElementById('cassaforteCard').style.display = 'block';
+                    document.getElementById('nomeUtenteConnesso').innerText = u;
+
+                    // Pulisci i campi
+                    document.getElementById('user').value = '';
+                    document.getElementById('pass').value = '';
+                } else {
+                    tokenCustodito = null;
+                    box.style.background = "#991b1b";
+                    box.innerText = `[401 Errore] ${data.messaggio}`;
+                }
+            } catch (err) {
                 tokenCustodito = null;
                 box.style.background = "#991b1b";
-                box.innerText = `[401 Errore] ${data.messaggio}`;
+                box.innerText = `[Errore di Rete] Impossibile contattare il server.\n${err.message}`;
+            } finally {
+                setCaricamento(false);
             }
+        }
+
+        function eseguiLogout() {
+            tokenCustodito = null;
+
+            // Ripristina l'interfaccia iniziale
+            document.getElementById('loginCard').style.display = 'block';
+            document.getElementById('welcomeCard').style.display = 'none';
+            document.getElementById('cassaforteCard').style.display = 'none';
+
+            const box = document.getElementById('statusBox');
+            box.style.background = "#334155";
+            box.innerText = "Disconnessione effettuata con successo.";
         }
 
         async function chiediDati() {
@@ -201,20 +288,31 @@
                 return;
             }
 
-            const res = await fetch(`${BASE_URL}/dati-protetti`, {
-                method: "GET",
-                headers: {
-                    "x-token": tokenCustodito  // <-- ESIBIAMO IL TOKEN ALLA PORTA DEL SERVER
-                }
-            });
+            box.style.background = "#334155";
+            box.innerText = "Recupero dati protetti in corso...";
+            setCaricamento(true);
 
-            if (res.ok) {
-                const data = await res.json();
-                box.style.background = "#1e3a8a";
-                box.innerText = `[200 OK] Accesso Concesso dal Server!\nDati estratti: ${JSON.stringify(data.dati)}`;
-            } else {
+            try {
+                const res = await fetch(`${BASE_URL}/dati-protetti`, {
+                    method: "GET",
+                    headers: {
+                        "x-token": tokenCustodito  // <-- ESIBIAMO IL TOKEN ALLA PORTA DEL SERVER
+                    }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    box.style.background = "#1e3a8a";
+                    box.innerText = `[200 OK] Accesso Concesso dal Server!\nDati estratti: ${JSON.stringify(data.dati)}`;
+                } else {
+                    box.style.background = "#991b1b";
+                    box.innerText = `[Errore ${res.status}] Il server ha rifiutato il braccialetto!`;
+                }
+            } catch (err) {
                 box.style.background = "#991b1b";
-                box.innerText = `[Errore ${res.status}] Il server ha rifiutato il braccialetto!`;
+                box.innerText = `[Errore di Rete] Impossibile contattare il server.\n${err.message}`;
+            } finally {
+                setCaricamento(false);
             }
         }
     </script>
